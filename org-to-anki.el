@@ -78,16 +78,29 @@
        (zds/org-parents section)
        (zds/org-element-to-text-in-buffer section)))))
 
-(defun zds/parse-org-captured-headlines (tree)
+(defun zds/parse-org-captured-headlines-as-list (tree)
   (org-element-map
-      tree
-      'headline
-    (lambda (headline)
-      (when (member "cap" (zds/org-element-tags headline))
-        (zds/make-card
-         (or (zds/org-parents headline) "None")
-         (org-element-property :raw-value headline))))))
+   tree
+   'headline
+   (lambda (headline)
+     (and (eq (org-element-property :parent headline) tree) ;; only direct descendants
+          (member "cap" (zds/org-element-tags headline)) ;; with the capture tag
+          (org-element-property :raw-value headline)))))
 
+(defun zds/parse-org-captured-headlines (tree)
+  (cl-remove-duplicates
+   (org-element-map
+       tree
+       'headline
+     (lambda (headline)
+       (let* ((parent (org-element-property :parent headline))
+              (parents-string (zds/org-parents headline))
+              (children (zds/parse-org-captured-headlines-as-list parent)))
+         (unless (or (null parent) (null children))
+           (zds/make-card
+            (or (zds/org-parents headline) "None")
+            (concat "+ " (mapconcat #'identity children "\n+ ")))))))
+   :test #'equal))
 
 (defun zds/org-to-anki-csv (dest-file)
   (interactive "FOutput CSV to: ")
