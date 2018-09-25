@@ -42,32 +42,32 @@
              (reverse (zds/org-parents-helper org-element))
              " § "))
 
-(defun zds/parse-org-ast (tree)
-  (cond ((null tree) '())
+;; (defun zds/parse-org-ast (tree)
+;;   (cond ((null tree) '())
 
-        ;; Add captured headers
-        ((and (eq (org-element-type tree) 'headline) ;
-              (member "cap" (zds/org-element-tags tree)))
-         (zds/make-card
-          (org-element-property :raw-value tree)
-          "HAHA"))
+;;         ;; Add captured headers
+;;         ((and (eq (org-element-type tree) 'headline) ;
+;;               (member "cap" (zds/org-element-tags tree)))
+;;          (zds/make-card
+;;           (org-element-property :raw-value tree)
+;;           "HAHA"))
 
-        ;; Add this as a card
-        ((member (org-element-type tree)
-                 '(paragraph section))
-         (zds/make-card
-          (zds/org-parents tree)
-          (zds/org-element-to-text-in-buffer tree)))
+;;         ;; Add this as a card
+;;         ((member (org-element-type tree)
+;;                  '(paragraph section))
+;;          (zds/make-card
+;;           (zds/org-parents tree)
+;;           (zds/org-element-to-text-in-buffer tree)))
         
-        ((eq (org-element-type tree)
-             'headline)
-         (seq-mapcat
-          #'zds/parse-org-ast
-          (org-element-contents tree)))
+;;         ((eq (org-element-type tree)
+;;              'headline)
+;;          (seq-mapcat
+;;           #'zds/parse-org-ast
+;;           (org-element-contents tree)))
         
-        (t (seq-mapcat
-            #'zds/parse-org-ast
-            (org-element-contents tree)))))
+;;         (t (seq-mapcat
+;;             #'zds/parse-org-ast
+;;             (org-element-contents tree)))))
 
 (defun zds/parse-org-sections (tree)
   (org-element-map
@@ -76,7 +76,7 @@
     (lambda (section)
       (zds/make-card
        (zds/org-parents section)
-       (zds/org-element-to-text-in-buffer section)))))
+       (zds/org-element-to-text-in-buffer (first (org-element-contents section)))))))
 
 (defun zds/parse-org-captured-headlines-as-list (tree)
   (org-element-map
