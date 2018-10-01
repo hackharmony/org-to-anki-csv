@@ -87,6 +87,14 @@
           (member "cap" (zds/org-element-tags headline)) ;; with the capture tag
           (org-element-property :raw-value headline)))))
 
+(defun zds/make-list (lines &optional bullet)
+  (cond ((zerop (length lines)) "")
+        ((< (length lines) 2) (car lines))
+        (t (let ((bullet (concat (or bullet "+") " ")))
+             (concat bullet
+                     (mapconcat #'identity lines
+                                (concat "\n" bullet)))))))
+
 (defun zds/parse-org-captured-headlines (tree)
   (cl-remove-duplicates
    (org-element-map
@@ -99,7 +107,7 @@
          (unless (or (null parent) (null children))
            (zds/make-card
             (or (zds/org-parents headline) "None")
-            (concat "+ " (mapconcat #'identity children "\n+ ")))))))
+            (zds/make-list children))))))
    :test #'equal))
 
 (defun zds/org-to-anki-csv (dest-file)
