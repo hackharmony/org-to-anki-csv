@@ -3,13 +3,18 @@
 
 (defun zds/org-element-to-text-in-buffer (org-element)
   (replace-regexp-in-string
-   "\n$"
-   ""
-   (buffer-substring-no-properties
-    (org-element-property :begin
-                          org-element)
-    (org-element-property :end
-                          org-element))))
+   ;;;;;;;;; converts/"escapes"
+   "	" ;; tab literal ->
+   "    " ;; four spaces
+   ;; because we're using TABs to represent the CSV separator character
+   (replace-regexp-in-string
+    "\n$"
+    ""
+    (buffer-substring-no-properties
+     (org-element-property :begin
+                           org-element)
+     (org-element-property :end
+                           org-element)))))
 
 (defun zds/strip-properties (prop)
   (set-text-properties 0 (length prop) nil prop)
@@ -26,6 +31,11 @@
 
 (defun zds/make-card (front back)
   (cons front back))
+
+(defun zds/flatten-org-parents (org-element)
+  (loop for oe = org-element then (org-element-property :parent oe)
+        until (null oe)
+        collect oe))
 
 (defun zds/org-parents-helper (org-element)
   (if (null org-element) '()
@@ -69,14 +79,19 @@
 ;;             #'zds/parse-org-ast
 ;;             (org-element-contents tree)))))
 
+(defun zds/any-parents-marked-ignore? (org-element)
+  (cl-some #'(lambda (x) (member "ignore" (zds/org-element-tags x)))
+           (zds/flatten-org-parents org-element)))
+
 (defun zds/parse-org-sections (tree)
   (org-element-map
       tree
       'section
-    (lambda (section)
-      (zds/make-card
-       (zds/org-parents section)
-       (zds/org-element-to-text-in-buffer (first (org-element-contents section)))))))
+      (lambda (section)
+        (unless (zds/any-parents-marked-ignore? section)
+          (zds/make-card
+           (zds/org-parents section)
+           (zds/org-element-to-text-in-buffer (first (org-element-contents section))))))))
 
 (defun zds/parse-org-captured-headlines-as-list (tree)
   (org-element-map
@@ -85,6 +100,7 @@
    (lambda (headline)
      (and (eq (org-element-property :parent headline) tree) ;; only direct descendants
           (member "cap" (zds/org-element-tags headline)) ;; with the capture tag
+          (not (zds/any-parents-marked-ignore? headline)) ;; not part of an :ignore:d subtree
           (org-element-property :raw-value headline)))))
 
 (defun zds/make-list (lines &optional bullet)
