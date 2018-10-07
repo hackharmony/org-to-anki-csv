@@ -1,5 +1,8 @@
 (defconst +sep+ "	")
 
+(defcustom captured-tag-name "cap"
+  "org-mode tag name for sub-headlines that should be captured as list items with its parent headlines as the front of the flashcard")
+
 
 (defun zds/org-element-to-text-in-buffer (org-element)
   (replace-regexp-in-string
@@ -57,7 +60,7 @@
 
 ;;         ;; Add captured headers
 ;;         ((and (eq (org-element-type tree) 'headline) ;
-;;               (member "cap" (zds/org-element-tags tree)))
+;;               (member captured-tag-name (zds/org-element-tags tree)))
 ;;          (zds/make-card
 ;;           (org-element-property :raw-value tree)
 ;;           "HAHA"))
@@ -99,7 +102,7 @@
    'headline
    (lambda (headline)
      (and (eq (org-element-property :parent headline) tree) ;; only direct descendants
-          (member "cap" (zds/org-element-tags headline)) ;; with the capture tag
+          (member captured-tag-name (zds/org-element-tags headline)) ;; with the capture tag
           (not (zds/any-parents-marked-ignore? headline)) ;; not part of an :ignore:d subtree
           (org-element-property :raw-value headline)))))
 
@@ -146,3 +149,11 @@
       (insert (concat +sep+ "\n")) ;; first line is separator
       (insert csv)
       )))
+
+
+(defun zds/org-set-tag-to-cap (point mark)
+  (interactive "r")
+  (if (use-region-p)
+      (org-change-tag-in-region point mark captured-tag-name nil)
+    (org-set-tags-to (list captured-tag-name))))
+
