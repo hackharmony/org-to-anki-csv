@@ -154,6 +154,11 @@
 (defun zds/org-set-tag-to-cap (point mark)
   (interactive "r")
   (if (use-region-p)
-      (org-change-tag-in-region point mark captured-tag-name nil)
+      (save-excursion
+        (progn
+          ;; because ORG-CHANGE-TAG-IN-REGION doesn't seem to affect the last line selected in the region, I have to nudge the region one line down
+          (goto-char mark)
+          (move-end-of-line nil)
+          (org-change-tag-in-region point (1+ (point)) captured-tag-name nil)))
     (org-set-tags-to (list captured-tag-name))))
 
