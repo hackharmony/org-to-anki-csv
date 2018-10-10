@@ -162,3 +162,42 @@
           (org-change-tag-in-region point (1+ (point)) captured-tag-name nil)))
     (org-set-tags-to (list captured-tag-name))))
 
+(defun zds/org-set-tag-to-cap-on-all-same-level-headlines ()
+  "Indicate capturing the headline at current point and all its sibling headlines"
+  (interactive)
+  (let ((element-at-point (org-element-at-point))
+        (ast (org-element-parse-buffer))
+        (old-point (point))
+        (tag-inserts-count 0))
+    (when (eq (org-element-type element-at-point) 'headline)
+      (org-element-map ast 'headline
+        (lambda (headline-at-point)
+          (when (equal (org-element-property :raw-value element-at-point)
+                       (org-element-property :raw-value headline-at-point))
+            (let ((headline-at-point-parent (org-element-property :parent headline-at-point)))
+              (org-element-map
+                  headline-at-point-parent
+                  'headline
+                (lambda (sibling-of-target-headline)
+                  (and (equal
+                        (org-element-property :raw-value headline-at-point-parent)
+                        (org-element-property :raw-value (org-element-property :parent sibling-of-target-headline)))
+                       (org-element-set-element
+                        sibling-of-target-headline
+                        (progn (org-element-put-property sibling-of-target-headline
+                                                         :tags
+                                                         (list captured-tag-name))
+                               (incf tag-inserts-count)
+                               sibling-of-target-headline)
+                        ;; (org-change-tag-in-region
+                        ;;  (org-element-property :begin sibling-of-target-headline)
+                        ;;  (org-element-property :end sibling-of-target-headline)
+                        ;;  captured-tag-name nil)
+                        )))))))))
+    ;; write the new AST to the buffer
+    (erase-buffer)
+    (insert (org-element-interpret-data ast))
+    (goto-char (+ old-point (* (+ 3 (length captured-tag-name)) tag-inserts-count))) ;; this tries to restore the point and compensate for the newly inserted text
+    ;; TODO need to adjust TAG-INSERTS-COUNT to how many inserts were /before/ OLD-POINT
+    )
+    )
