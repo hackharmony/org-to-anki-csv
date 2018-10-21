@@ -3,27 +3,24 @@
 (defcustom captured-tag-name "cap"
   "org-mode tag name for sub-headlines that should be captured as list items with its parent headlines as the front of the flashcard")
 
+(defcustom aslist-tag-name "aslist"
+  "the name of the tag on headlines to indicate that the subheadlines under this headline are to be captured as a list to be on the other side of the flashcard")
 
-(defun zds/org-element-to-text-in-buffer (org-element)
+(defun org->anki/org-element-to-text-in-buffer (org-element)
   (replace-regexp-in-string
-   ;;;;;;;;; converts/"escapes"
-   "	" ;; tab literal ->
-   "    " ;; four spaces
-   ;; because we're using TABs to represent the CSV separator character
-   (replace-regexp-in-string
-    "\n$"
-    ""
-    (buffer-substring-no-properties
-     (org-element-property :begin
-                           org-element)
-     (org-element-property :end
-                           org-element)))))
+   "\n$"
+   ""
+   (buffer-substring-no-properties
+    (org-element-property :begin
+                          org-element)
+    (org-element-property :end
+                          org-element))))
 
-(defun zds/strip-properties (prop)
+(defun org->anki/strip-properties (prop)
   (set-text-properties 0 (length prop) nil prop)
   prop)
 
-(defun zds/org-element-tags (org-element)
+(defun org->anki/org-element-tags (org-element)
   (let ((tags (org-element-property :tags org-element)))
     (mapcar
      #'(lambda (tag)
@@ -31,82 +28,87 @@
          tag)
      tags)))
 
+(defun org->anki/make-card (front back)
+  (cl-flet ((clean-string (s)
+                          (replace-regexp-in-string ;; converts/"escapes"
+                           "	" ;; tab literal ->
+                           "    " ;; four spaces
+                           ;; because we're using TABs to represent the CSV separator characters
+                           s)))
+    (cons (clean-string front) (clean-string back))))
 
-(defun zds/make-card (front back)
-  (cons front back))
-
-(defun zds/flatten-org-parents (org-element)
+(defun org->anki/flatten-org-parents (org-element)
   (loop for oe = org-element then (org-element-property :parent oe)
         until (null oe)
         collect oe))
 
-(defun zds/org-parents-helper (org-element)
+(defun org->anki/org-parents-helper (org-element)
   (if (null org-element) '()
     (let* ((parent (org-element-property :parent org-element))
-           (text-alone (zds/strip-properties
+           (text-alone (org->anki/strip-properties
                     (org-element-property :raw-value parent)))
            (str (format "%s" text-alone)))
       (if (null text-alone)
-          (zds/org-parents-helper parent)
-        (cons str (zds/org-parents-helper parent))))))
+          (org->anki/org-parents-helper parent)
+        (cons str (org->anki/org-parents-helper parent))))))
 
-(defun zds/org-parents (org-element)
+(defun org->anki/org-parents (org-element)
   (mapconcat #'identity
-             (reverse (zds/org-parents-helper org-element))
+             (reverse (org->anki/org-parents-helper org-element))
              " § "))
 
-;; (defun zds/parse-org-ast (tree)
+;; (defun org->anki/parse-org-ast (tree)
 ;;   (cond ((null tree) '())
 
 ;;         ;; Add captured headers
 ;;         ((and (eq (org-element-type tree) 'headline) ;
-;;               (member captured-tag-name (zds/org-element-tags tree)))
-;;          (zds/make-card
+;;               (member captured-tag-name (org->anki/org-element-tags tree)))
+;;          (org->anki/make-card
 ;;           (org-element-property :raw-value tree)
 ;;           "HAHA"))
 
 ;;         ;; Add this as a card
 ;;         ((member (org-element-type tree)
 ;;                  '(paragraph section))
-;;          (zds/make-card
-;;           (zds/org-parents tree)
-;;           (zds/org-element-to-text-in-buffer tree)))
+;;          (org->anki/make-card
+;;           (org->anki/org-parents tree)
+;;           (org->anki/org-element-to-text-in-buffer tree)))
         
 ;;         ((eq (org-element-type tree)
 ;;              'headline)
 ;;          (seq-mapcat
-;;           #'zds/parse-org-ast
+;;           #'org->anki/parse-org-ast
 ;;           (org-element-contents tree)))
         
 ;;         (t (seq-mapcat
-;;             #'zds/parse-org-ast
+;;             #'org->anki/parse-org-ast
 ;;             (org-element-contents tree)))))
 
-(defun zds/any-parents-marked-ignore? (org-element)
-  (cl-some #'(lambda (x) (member "ignore" (zds/org-element-tags x)))
-           (zds/flatten-org-parents org-element)))
+(defun org->anki/any-parents-marked-ignore? (org-element)
+  (cl-some #'(lambda (x) (member "ignore" (org->anki/org-element-tags x)))
+           (org->anki/flatten-org-parents org-element)))
 
-(defun zds/parse-org-sections (tree)
+(defun org->anki/parse-org-sections (tree)
   (org-element-map
       tree
       'section
       (lambda (section)
-        (unless (zds/any-parents-marked-ignore? section)
-          (zds/make-card
-           (zds/org-parents section)
-           (zds/org-element-to-text-in-buffer (first (org-element-contents section))))))))
+        (unless (org->anki/any-parents-marked-ignore? section)
+          (org->anki/make-card
+           (org->anki/org-parents section)
+           (org->anki/org-element-to-text-in-buffer (first (org-element-contents section))))))))
 
-(defun zds/parse-org-captured-headlines-as-list (tree)
+(defun org->anki/parse-org-captured-headlines-as-list (tree)
   (org-element-map
    tree
    'headline
    (lambda (headline)
      (and (eq (org-element-property :parent headline) tree) ;; only direct descendants
-          (member captured-tag-name (zds/org-element-tags headline)) ;; with the capture tag
-          (not (zds/any-parents-marked-ignore? headline)) ;; not part of an :ignore:d subtree
+          (member captured-tag-name (org->anki/org-element-tags headline)) ;; with the capture tag
+          (not (org->anki/any-parents-marked-ignore? headline)) ;; not part of an :ignore:d subtree
           (org-element-property :raw-value headline)))))
 
-(defun zds/make-list (lines &optional bullet)
+(defun org->anki/make-list (lines &optional bullet)
   (cond ((zerop (length lines)) "")
         ((< (length lines) 2) (car lines))
         (t (let ((bullet (concat (or bullet "+") " ")))
@@ -114,27 +116,49 @@
                      (mapconcat #'identity lines
                                 (concat "\n" bullet)))))))
 
-(defun zds/parse-org-captured-headlines (tree)
+(defun org->anki/parse-org-captured-headlines (tree)
   (cl-remove-duplicates
    (org-element-map
        tree
        'headline
      (lambda (headline)
        (let* ((parent (org-element-property :parent headline))
-              (parents-string (zds/org-parents headline))
-              (children (zds/parse-org-captured-headlines-as-list parent)))
+              (parents-string (org->anki/org-parents headline))
+              (children (org->anki/parse-org-captured-headlines-as-list parent)))
          (unless (or (null parent) (null children))
-           (zds/make-card
-            (or (zds/org-parents headline) "None")
-            (zds/make-list children))))))
+           (org->anki/make-card
+            (or (org->anki/org-parents headline) "None")
+            (org->anki/make-list children))))))
    :test #'equal))
 
-(defun zds/org-to-anki-csv (dest-file)
+(defun org->anki/parse-org-aslist-headlines (tree)
+  (let ((cards))
+    (org-element-map tree
+                     'headline
+                     #'(lambda (headline)
+                         (when (member aslist-tag-name (org->anki/org-element-tags headline))
+                           (push (org->anki/make-card (org-element-property :raw-value headline)
+                                                (org->anki/make-list
+                                                 (org-element-map headline
+                                                     'headline
+                                                   #'(lambda (subheadline)
+                                                       (and (eq (org-element-property :parent subheadline)
+                                                                headline)
+                                                            (org-element-property :raw-value subheadline))))))
+                                 cards))))
+    cards))
+                           
+
+(defun org->anki/org-to-anki-csv (dest-file)
   (interactive "FOutput CSV to: ")
   (let* ((tree (org-element-parse-buffer))
          (parsed (concatenate 'list
-                              (zds/parse-org-captured-headlines tree)
-                              (zds/parse-org-sections tree)))
+                              ;; headlines that were individually captured as list items representing side B of a flashcard with its parent headline as side A
+                              (org->anki/parse-org-captured-headlines tree)
+                              ;; an "aslist" headline captures all its subheadlines as a list for side B of the card
+                              (org->anki/parse-org-aslist-headlines tree)
+                              ;; all the text under headlines are captured as cards where: side A is the full sequence of its parent headlines, and side B is the actual text in the section
+                              (org->anki/parse-org-sections tree)))
          (csv (loop for (front . back) in parsed
                     with s = ""
                     do (setf s
@@ -151,8 +175,7 @@
       )))
 
 
-(defun zds/org-set-tag-to-cap (point mark)
-  (interactive "r")
+(defun org->anki/org-set-tag-to (point mark tag)
   (if (use-region-p)
       (save-excursion
         (progn
@@ -160,9 +183,13 @@
           (goto-char mark)
           (move-end-of-line nil)
           (org-change-tag-in-region point (1+ (point)) captured-tag-name nil)))
-    (org-set-tags-to (list captured-tag-name))))
+    (org-set-tags-to (list tag))))
 
-(defun zds/org-set-tag-to-cap-on-all-same-level-headlines ()
+(defun org->anki/org-set-tag-to-cap (point mark)
+  (interactive "r")
+  (org->anki/org-set-tag-to point mark captured-tag-name))
+
+(defun org->anki/org-set-tag-to-cap-on-all-same-level-headlines ()
   "Indicate capturing the headline at current point and all its sibling headlines"
   (interactive)
   (let ((element-at-point (org-element-at-point))
@@ -201,3 +228,5 @@
     ;; TODO need to adjust TAG-INSERTS-COUNT to how many inserts were /before/ OLD-POINT
     )
     )
+
+(provide 'org->anki)
