@@ -3,7 +3,7 @@
 (defcustom captured-tag-name "cap"
   "org-mode tag name for sub-headlines that should be captured as list items with its parent headlines as the front of the flashcard")
 
-(defcustom aslist-tag-name "aslist"
+(defcustom aslist-tag-name "l"
   "the name of the tag on headlines to indicate that the subheadlines under this headline are to be captured as a list to be on the other side of the flashcard")
 
 (defun org->anki/org-element-to-text-in-buffer (org-element)
