@@ -137,14 +137,17 @@
                      'headline
                      #'(lambda (headline)
                          (when (member aslist-tag-name (org->anki/org-element-tags headline))
-                           (push (org->anki/make-card (org-element-property :raw-value headline)
-                                                (org->anki/make-list
-                                                 (org-element-map headline
-                                                     'headline
-                                                   #'(lambda (subheadline)
-                                                       (and (eq (org-element-property :parent subheadline)
-                                                                headline)
-                                                            (org-element-property :raw-value subheadline))))))
+                           (push (org->anki/make-card
+                                  (concat (org->anki/org-parents headline)
+                                          " § "
+                                          (org-element-property :raw-value headline))
+                                  (org->anki/make-list
+                                   (org-element-map headline
+                                       'headline
+                                     #'(lambda (subheadline)
+                                         (and (eq (org-element-property :parent subheadline)
+                                                  headline)
+                                              (org-element-property :raw-value subheadline))))))
                                  cards))))
     cards))
                            
