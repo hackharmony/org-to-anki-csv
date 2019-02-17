@@ -28,14 +28,14 @@
          tag)
      tags)))
 
-(defun org->anki/make-card (front back)
+(defun org->anki/make-card (front back tag)
   (cl-flet ((clean-string (s)
                           (replace-regexp-in-string ;; converts/"escapes"
                            "	" ;; tab literal ->
                            "    " ;; four spaces
                            ;; because we're using TABs to represent the CSV separator characters
                            s)))
-    (cons (clean-string front) (clean-string back))))
+    (list (clean-string front) (clean-string back) (clean-string tag))))
 
 (defun org->anki/flatten-org-parents (org-element)
   (loop for oe = org-element then (org-element-property :parent oe)
@@ -84,6 +84,45 @@
 ;;             #'org->anki/parse-org-ast
 ;;             (org-element-contents tree)))))
 
+(defun org->anki/with-parents (element f)
+  (unless (null element)
+    (funcall f element) ;; starts at 'ELEMENT', assuming it's the first parent
+    (org->anki/with-parents
+     (org-element-property :parent element)
+     f)))
+
+(defun org->anki/priority-of-nearest-parent (element)
+  (let ((priority))
+    (org->anki/with-parents
+     element
+     #'(lambda (x)
+         (let ((this-priority (org-element-property :priority x)))
+           (when (and (null priority) this-priority)
+             (setq priority this-priority)))))
+    priority))
+
+(defun org->anki/get-priority (element)
+  (ignore-errors
+    (char-to-string (org->anki/priority-of-nearest-parent element))))
+
+(defun org->anki/get-first-tag (element)
+  (let ((tag))
+    (org->anki/with-parents
+     element
+     #'(lambda (x)
+         (let ((these-tags (org-element-property :tags x)))
+           (when (and (null tag) these-tags)
+             (setq tag (first these-tags))))))))
+
+(defun org->anki/get-priority-or-tag (element)
+  (or (org->anki/get-priority element)
+      (let ((tag-found (org->anki/get-first-tag element)))
+        (and
+         (not (member tag-found '(captured-tag-name aslist-tag-name)))
+         ;; ignore the tags that have some predetermined meaning in our format
+         tag-found))
+      "None"))
+
 (defun org->anki/any-parents-marked-ignore? (org-element)
   (cl-some #'(lambda (x) (member "ignore" (org->anki/org-element-tags x)))
            (org->anki/flatten-org-parents org-element)))
@@ -96,7 +135,9 @@
         (unless (org->anki/any-parents-marked-ignore? section)
           (org->anki/make-card
            (org->anki/org-parents section)
-           (org->anki/org-element-to-text-in-buffer (first (org-element-contents section))))))))
+           (org->anki/org-element-to-text-in-buffer (first (org-element-contents section)))
+           (org->anki/get-priority-or-tag section)
+           )))))
 
 (defun org->anki/parse-org-captured-headlines-as-list (tree)
   (org-element-map
@@ -128,7 +169,9 @@
          (unless (or (null parent) (null children))
            (org->anki/make-card
             (or (org->anki/org-parents headline) "None")
-            (org->anki/make-list children))))))
+            (org->anki/make-list children)
+            (org->anki/get-priority-or-tag headline)
+            )))))
    :test #'equal))
 
 (defun org->anki/parse-org-aslist-headlines (tree)
@@ -147,12 +190,14 @@
                                      #'(lambda (subheadline)
                                          (and (eq (org-element-property :parent subheadline)
                                                   headline)
-                                              (org-element-property :raw-value subheadline))))))
+                                              (org-element-property :raw-value subheadline)))))
+                                  (org->anki/get-priority-or-tag headline)
+                                  )
                                  cards))))
     cards))
-                           
 
-(defun org->anki/org-to-anki-csv (dest-file)
+
+(defun org->anki (dest-file)
   (interactive "FOutput CSV to: ")
   (let* ((tree (org-element-parse-buffer))
          (parsed (concatenate 'list
@@ -162,7 +207,7 @@
                               (org->anki/parse-org-aslist-headlines tree)
                               ;; all the text under headlines are captured as cards where: side A is the full sequence of its parent headlines, and side B is the actual text in the section
                               (org->anki/parse-org-sections tree)))
-         (csv (loop for (front . back) in parsed
+         (csv (loop for (front back . tag) in parsed
                     with s = ""
                     do (setf s
                              (concat
@@ -170,6 +215,8 @@
                               front
                               +sep+
                               (replace-regexp-in-string "\n\?$" "<br>" back)
+                              +sep+
+                              (first tag)
                               "\n"))
                     finally return s)))
     (with-temp-file dest-file
