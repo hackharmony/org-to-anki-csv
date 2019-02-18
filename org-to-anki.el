@@ -6,6 +6,15 @@
 (defcustom aslist-tag-name "l"
   "the name of the tag on headlines to indicate that the subheadlines under this headline are to be captured as a list to be on the other side of the flashcard")
 
+(defun org->anki/get-text-content (org-element)
+  (let ((org-elements (org-element-contents org-element)))
+    (replace-regexp-in-string
+     "\n$"
+     ""
+     (buffer-substring-no-properties
+      (org-element-property :begin (first org-elements))
+      (org-element-property :end (car (last org-elements)))))))
+
 (defun org->anki/org-element-to-text-in-buffer (org-element)
   (replace-regexp-in-string
    "\n$"
@@ -135,7 +144,7 @@
         (unless (org->anki/any-parents-marked-ignore? section)
           (org->anki/make-card
            (org->anki/org-parents section)
-           (org->anki/org-element-to-text-in-buffer (first (org-element-contents section)))
+           (org->anki/get-text-content section)
            (org->anki/get-priority-or-tag section)
            )))))
 
