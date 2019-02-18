@@ -206,7 +206,7 @@
     cards))
 
 
-(defun org->anki (dest-file)
+(defun org-to-anki (dest-file)
   (interactive "FOutput CSV to: ")
   (let* ((tree (org-element-parse-buffer))
          (parsed (concatenate 'list
@@ -288,4 +288,4 @@
     )
     )
 
-(provide 'org->anki)
+(provide 'org-to-anki)
