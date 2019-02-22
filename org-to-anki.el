@@ -8,12 +8,9 @@
 
 (defun org->anki/get-text-content (org-element)
   (let ((org-elements (org-element-contents org-element)))
-    (replace-regexp-in-string
-     "\n$"
-     ""
-     (buffer-substring-no-properties
-      (org-element-property :begin (first org-elements))
-      (org-element-property :end (car (last org-elements)))))))
+    (buffer-substring-no-properties
+     (org-element-property :begin (first org-elements))
+     (org-element-property :end (car (last org-elements))))))
 
 (defun org->anki/org-element-to-text-in-buffer (org-element)
   (replace-regexp-in-string
